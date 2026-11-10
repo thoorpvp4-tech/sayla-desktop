@@ -1,0 +1,98 @@
+{
+  "name": "sayla-desktop",
+  "productName": "Sayla",
+  "version": "1.0.0",
+  "description": "Sayla — Say it. It's planned. The voice-first planner for Windows and Mac.",
+  "author": "Sayla",
+  "homepage": "https://getsayla.com",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist:win": "electron-builder --win --publish never",
+    "dist:mac": "electron-builder --mac --publish never"
+  },
+  "devDependencies": {
+    "electron": "33.2.1",
+    "electron-builder": "25.1.8"
+  },
+  "build": {
+    "appId": "com.getsayla.app",
+    "productName": "Sayla",
+    "copyright": "© 2026 Sayla",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "package.json"
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "thoorpvp4-tech",
+        "repo": "sayla-desktop",
+        "releaseType": "release"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "artifactName": "Sayla-Setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Sayla",
+      "runAfterFinish": true
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "category": "public.app-category.productivity",
+      "identity": "-",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "artifactName": "Sayla.${ext}",
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Sayla listens when you tap the orb, so you can plan your day by voice."
+      }
+    },
+    "dmg": {
+      "title": "Sayla",
+      "contents": [
+        {
+          "x": 140,
+          "y": 190
+        },
+        {
+          "x": 400,
+          "y": 190,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    }
+  },
+  "allowScripts": {
+    "electron@33.2.1": true
+  }
+}

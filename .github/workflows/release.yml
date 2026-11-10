@@ -1,0 +1,30 @@
+# Builds Sayla for Windows (.exe) and Mac (.dmg) and puts them in a GitHub Release.
+# Runs when a version tag is pushed (git tag v1.0.0 && git push --tags), or by hand from the Actions tab.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - name: Build and publish
+        run: npx electron-builder ${{ matrix.os == 'windows-latest' && '--win' || '--mac' }} --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: false
