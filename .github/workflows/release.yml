@@ -24,7 +24,7 @@ jobs:
           node-version: 20
       - run: npm install
       - name: Build and publish
-        run: npx electron-builder ${{ matrix.os == 'windows-latest' && '--win' || '--mac' }} --publish always
+        run: npx electron-builder ${{ matrix.os == 'windows-latest' && '--win nsis appx' || '--mac' }} --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false

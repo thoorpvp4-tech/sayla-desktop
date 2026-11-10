@@ -1,7 +1,7 @@
 {
   "name": "sayla-desktop",
   "productName": "Sayla",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Sayla — Say it. It's planned. The voice-first planner for Windows and Mac.",
   "author": "Sayla",
   "homepage": "https://getsayla.com",
@@ -18,6 +18,7 @@
   },
   "build": {
     "appId": "com.getsayla.app",
+    "appxManifestCreated": "./build/appx-manifest-hook.js",
     "productName": "Sayla",
     "copyright": "© 2026 Sayla",
     "directories": {
@@ -47,6 +48,17 @@
       ],
       "icon": "build/icon.png",
       "artifactName": "Sayla-Setup.${ext}"
+    },
+    "appx": {
+      "identityName": "Sayla.Sayla",
+      "publisher": "CN=AEF2E2C9-09A5-415E-BDDF-D4FAFE1D81C0",
+      "publisherDisplayName": "Sayla",
+      "applicationId": "Sayla",
+      "displayName": "Sayla",
+      "backgroundColor": "transparent",
+      "showNameOnTiles": false,
+      "languages": ["en-US", "pt-PT", "es-ES", "fr-FR"],
+      "artifactName": "Sayla-Store.${ext}"
     },
     "nsis": {
       "oneClick": false,
