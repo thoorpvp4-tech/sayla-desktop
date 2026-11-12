@@ -2,7 +2,7 @@
 // The program opens the real Sayla app in its own window, so every update we publish reaches it automatically.
 const { app, BrowserWindow, shell, session, systemPreferences, Menu } = require('electron');
 
-const APP_URL = 'https://tablefor.thoorpvp4.workers.dev/';
+const APP_URL = 'https://app.getsayla.com/';
 const APP_HOST = new URL(APP_URL).host;
 
 // Only one Sayla window at a time: opening it again brings the existing one to the front.
