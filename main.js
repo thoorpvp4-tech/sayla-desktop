@@ -4,6 +4,12 @@ const { app, BrowserWindow, shell, session, systemPreferences, Menu } = require(
 
 const APP_URL = 'https://app.getsayla.com/';
 const APP_HOST = new URL(APP_URL).host;
+// Compare the exact host (https only). A substring check let 'https://other.site/?app.getsayla.com' through,
+// which opened that site inside the Sayla window and gave it the microphone.
+const hostOf = (u) => { try { const x = new URL(u); return x.protocol === 'https:' ? x.host : ''; } catch (e) { return ''; } };
+const isApp = (u) => hostOf(u) === APP_HOST;
+// only web and email links go to the system (never file:, custom protocols or anything else)
+const openOutside = (u) => { try { if (['https:', 'http:', 'mailto:'].includes(new URL(u).protocol)) shell.openExternal(u); } catch (e) {} };
 
 // Only one Sayla window at a time: opening it again brings the existing one to the front.
 if (!app.requestSingleInstanceLock()) { app.quit(); }
@@ -31,8 +37,8 @@ function createWindow() {
   win.once('ready-to-show', () => win.show());
 
   // links to other sites (WhatsApp, Google, legal pages…) open in the normal browser
-  win.webContents.setWindowOpenHandler(({ url }) => { if (!url.includes(APP_HOST)) shell.openExternal(url); return { action: url.includes(APP_HOST) ? 'allow' : 'deny' }; });
-  win.webContents.on('will-navigate', (e, url) => { if (!url.includes(APP_HOST) && !url.startsWith('https://accounts.google.com')) { e.preventDefault(); shell.openExternal(url); } });
+  win.webContents.setWindowOpenHandler(({ url }) => { if (!isApp(url)) openOutside(url); return { action: isApp(url) ? 'allow' : 'deny' }; });
+  win.webContents.on('will-navigate', (e, url) => { if (!isApp(url) && hostOf(url) !== 'accounts.google.com') { e.preventDefault(); openOutside(url); } });
 
   // no connection: show a friendly page and try again
   win.webContents.on('did-fail-load', (e, code, desc, url, isMain) => {
@@ -51,10 +57,10 @@ app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(
 app.whenReady().then(async () => {
   // microphone for voice notes (Sayla only)
   session.defaultSession.setPermissionRequestHandler((wc, permission, cb) => {
-    const ok = ['media', 'notifications', 'clipboard-sanitized-write', 'fullscreen'].includes(permission) && wc.getURL().includes(APP_HOST);
+    const ok = ['media', 'notifications', 'clipboard-sanitized-write', 'fullscreen'].includes(permission) && isApp(wc.getURL());
     cb(ok);
   });
-  session.defaultSession.setPermissionCheckHandler((wc, permission, origin) => ['media', 'notifications'].includes(permission) && String(origin).includes(APP_HOST));
+  session.defaultSession.setPermissionCheckHandler((wc, permission, origin) => ['media', 'notifications'].includes(permission) && isApp(String(origin)));
   if (process.platform === 'darwin') { try { await systemPreferences.askForMediaAccess('microphone'); } catch (e) {} }
 
   // simple menu: on Mac it is needed for copy/paste and Cmd+Q; on Windows it stays hidden
