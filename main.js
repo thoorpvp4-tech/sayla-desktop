@@ -36,10 +36,6 @@ function createWindow() {
   win.loadURL(APP_URL);
   win.once('ready-to-show', () => win.show());
 
-  // links to other sites (WhatsApp, Google, legal pages…) open in the normal browser
-  win.webContents.setWindowOpenHandler(({ url }) => { if (!isApp(url)) openOutside(url); return { action: isApp(url) ? 'allow' : 'deny' }; });
-  win.webContents.on('will-navigate', (e, url) => { if (!isApp(url) && hostOf(url) !== 'accounts.google.com') { e.preventDefault(); openOutside(url); } });
-
   // no connection: show a friendly page and try again
   win.webContents.on('did-fail-load', (e, code, desc, url, isMain) => {
     if (!isMain || code === -3) return;
@@ -51,6 +47,16 @@ function createWindow() {
       <script>addEventListener('online',()=>location.href='${APP_URL}')</script>`));
   });
 }
+
+// v1.0.3: the same rules for EVERY window and frame (before, only the main window had them, so a window opened by the
+// app could navigate anywhere). Links to other sites (WhatsApp, Google, legal pages…) open in the normal browser.
+app.on('web-contents-created', (e, contents) => {
+  contents.setWindowOpenHandler(({ url }) => { if (!isApp(url)) openOutside(url); return { action: isApp(url) ? 'allow' : 'deny' }; });
+  contents.on('will-navigate', (ev, url) => { if (!isApp(url) && hostOf(url) !== 'accounts.google.com') { ev.preventDefault(); openOutside(url); } });
+  // main frame only: iframes (Google button, Cloudflare Turnstile) may redirect inside themselves
+  contents.on('will-redirect', (ev, url, inPlace, isMainFrame) => { if (isMainFrame && !isApp(url) && hostOf(url) !== 'accounts.google.com' && !/^data:/.test(url)) { ev.preventDefault(); openOutside(url); } });
+  contents.on('will-attach-webview', (ev) => ev.preventDefault()); // no <webview> tags
+});
 
 app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
 
