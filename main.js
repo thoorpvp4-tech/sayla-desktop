@@ -1,6 +1,8 @@
 // Sayla for Windows and Mac.
 // The program opens the real Sayla app in its own window, so every update we publish reaches it automatically.
 const { app, BrowserWindow, shell, session, systemPreferences, Menu } = require('electron');
+const http = require('http');
+const crypto = require('crypto');
 
 const APP_URL = 'https://app.getsayla.com/';
 const APP_HOST = new URL(APP_URL).host;
@@ -10,6 +12,37 @@ const hostOf = (u) => { try { const x = new URL(u); return x.protocol === 'https
 const isApp = (u) => hostOf(u) === APP_HOST;
 // only web and email links go to the system (never file:, custom protocols or anything else)
 const openOutside = (u) => { try { if (['https:', 'http:', 'mailto:'].includes(new URL(u).protocol)) shell.openExternal(u); } catch (e) {} };
+
+// Continue with Google, in the system browser. Google refuses sign-in inside embedded apps ("This browser or app may not
+// be secure"), and a Google popup opened in the browser cannot hand the sign-in back to this window (blank page).
+// So: a one-off server on 127.0.0.1 waits for a 2-minute single-use code; the browser opens
+// app.getsayla.com/entrar-pc.html, signs in there and sends the code back with the random `state` we created.
+// Then the app opens /#handoff=<code> (the app asks before logging in). The browser is left without a session.
+let loginSrv = null, loginTimer = null;
+const stopLogin = () => { clearTimeout(loginTimer); if (loginSrv) { try { loginSrv.close(); } catch (e) {} loginSrv = null; } };
+const donePage = (ok) => `<!doctype html><meta charset="utf-8"><title>Sayla</title><body style="margin:0;height:100vh;display:grid;place-items:center;font-family:Segoe UI,-apple-system,sans-serif;color:#1c1c1e;text-align:center"><div><div style="width:64px;height:64px;border-radius:18px;margin:0 auto 16px;background:linear-gradient(135deg,#ff8a3d,#ff4d8d 50%,#8b6cff)"></div><h1 style="font-size:24px;margin:0 0 8px">${ok ? 'Pronto · Done' : 'Este link já não vale · This link expired'}</h1><p style="color:#8e8e93;margin:0">${ok ? 'Volta ao programa da Sayla. Podes fechar este separador.<br>Go back to the Sayla app. You can close this tab.' : 'No programa, carrega outra vez em Continuar com Google.<br>In the app, click Continue with Google again.'}</p></div>`;
+function googleInBrowser() {
+  stopLogin();
+  const state = crypto.randomBytes(16).toString('hex');
+  loginSrv = http.createServer((req, res) => {
+    const u = new URL(req.url, 'http://127.0.0.1');
+    if (u.pathname !== '/sayla-login') { res.writeHead(404); return res.end(); }
+    const code = u.searchParams.get('code') || '';
+    const good = u.searchParams.get('state') === state && /^[A-Za-z0-9_-]{20,60}$/.test(code);
+    res.writeHead(good ? 200 : 400, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
+    res.end(donePage(good));
+    if (!good) return;
+    stopLogin();
+    // a new query string forces a full load: only a #hash change would not reload, and the app reads #handoff on start
+    if (win) { win.loadURL(APP_URL + '?pc=' + Date.now() + '#handoff=' + code); if (win.isMinimized()) win.restore(); win.show(); win.focus(); }
+  });
+  loginSrv.on('error', stopLogin);
+  loginSrv.listen(0, '127.0.0.1', () => {
+    openOutside(APP_URL + 'entrar-pc?port=' + loginSrv.address().port + '&state=' + state);
+    loginTimer = setTimeout(stopLogin, 10 * 60e3); // nobody came back in 10 minutes: stop listening
+  });
+}
+const isGoogleLogin = (u) => hostOf(u) === 'accounts.google.com';
 
 // Only one Sayla window at a time: opening it again brings the existing one to the front.
 if (!app.requestSingleInstanceLock()) { app.quit(); }
@@ -51,7 +84,12 @@ function createWindow() {
 // v1.0.3: the same rules for EVERY window and frame (before, only the main window had them, so a window opened by the
 // app could navigate anywhere). Links to other sites (WhatsApp, Google, legal pages…) open in the normal browser.
 app.on('web-contents-created', (e, contents) => {
-  contents.setWindowOpenHandler(({ url }) => { if (!isApp(url)) openOutside(url); return { action: isApp(url) ? 'allow' : 'deny' }; });
+  contents.setWindowOpenHandler(({ url }) => {
+    if (isApp(url)) return { action: 'allow' };
+    if (isGoogleLogin(url)) googleInBrowser(); // the Google button's popup: sign in through the browser instead
+    else openOutside(url);
+    return { action: 'deny' };
+  });
   contents.on('will-navigate', (ev, url) => { if (!isApp(url) && hostOf(url) !== 'accounts.google.com') { ev.preventDefault(); openOutside(url); } });
   // main frame only: iframes (Google button, Cloudflare Turnstile) may redirect inside themselves
   contents.on('will-redirect', (ev, url, inPlace, isMainFrame) => { if (isMainFrame && !isApp(url) && hostOf(url) !== 'accounts.google.com' && !/^data:/.test(url)) { ev.preventDefault(); openOutside(url); } });
